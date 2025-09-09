@@ -9,8 +9,8 @@
 		https://github.com/Nowoshire/Luau-Ring-Buffer/blob/main/LICENSE
 	
 	Constructors:
-		function interface.new(size: number?): (RingBuffer)
-		function interface.fromArray(t: Array): (RingBuffer)
+		function interface.new(size: number?): (RingBuffer<any>)
+		function interface.fromArray <T>(t: {T}): (RingBuffer<T>)
 		
 	Methods:
 		function IterateNewToOld <T>(r: RingBuffer<T>):
@@ -20,9 +20,9 @@
 		
 	RingBuffer:
 		Methods:
-			function Push <T>(self: RingBuffer, value: T): ()
-			function GetNewest <T>(self: RingBuffer): (T)
-			function GetOldest <T>(self: RingBuffer): (T)
+			function Push <T>(self: RingBuffer<T>, value: T): ()
+			function GetNewest <T>(self: RingBuffer<T>): (T)
+			function GetOldest <T>(self: RingBuffer<T>): (T)
 			
 			[Inherited from Methods]
 			function IterateNewToOld
@@ -41,7 +41,7 @@
 		buf:Push("b")
 		buf:Push("c")
 		
-		print(buf:GetNewest(), buf:GetOldest()) --> c a
+		print(buf:GetOldest(), buf:GetNewest()) --> a c
 		```
 ]]--
 
