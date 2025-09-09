@@ -57,7 +57,7 @@ local function iterNTO <T>(buf: RingBuffer<T>, count: number): (number?, T)
 		return nil, nil
 	end
 	
-	return count + 1, buf[(buf.index - count - 1) % size + 1] -- arrays are 1 based, so we need to offset by 1
+	return count + 1, buf[(buf.index - count) % size + 1] -- arrays are 1 based, so we need to offset by 1
 end
 
 local function iterOTN <T>(buf: RingBuffer<T>, count: number): (number?, T)
