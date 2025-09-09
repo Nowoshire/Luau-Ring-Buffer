@@ -36,7 +36,7 @@
 		```luau
 		local RingBuffer = require(path.to.RingBuffer)
 		
-		local buf = RingBuffer.new(3)
+		local buf = RingBuffer.interface.new(3)
 		buf:Push("a")
 		buf:Push("b")
 		buf:Push("c")
