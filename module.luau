@@ -9,24 +9,18 @@
 		https://github.com/Nowoshire/Luau-Ring-Buffer/blob/main/LICENSE
 	
 	Constructors:
-		function interface.new(size: number?): (RingBuffer<any>)
-		function interface.fromArray <T>(t: {T}): (RingBuffer<T>)
-		
-	Methods:
-		function IterateNewToOld <T>(r: RingBuffer<T>):
-			( (buf: RingBuffer<T>, count: number) -> (number?, T), RingBuffer<T>, number )
-		function IterateOldToNew <T>(r: RingBuffer<T>):
-			( (buf: RingBuffer<T>, count: number) -> (number?, T), RingBuffer<T>, number )
+		function new(size: number?): (RingBuffer<any>)
+		function fromArray <T>(t: {T}): (RingBuffer<T>)
 		
 	RingBuffer:
 		Methods:
 			function Push <T>(self: RingBuffer<T>, value: T): ()
 			function GetNewest <T>(self: RingBuffer<T>): (T)
 			function GetOldest <T>(self: RingBuffer<T>): (T)
-			
-			[Inherited from Methods]
-			function IterateNewToOld
-			function IterateOldToNew
+			function IterateNewToOld <T>(r: RingBuffer<T>):
+				( (buf: RingBuffer<T>, count: number) -> (number?, T), RingBuffer<T>, number )
+			function IterateOldToNew <T>(r: RingBuffer<T>):
+				( (buf: RingBuffer<T>, count: number) -> (number?, T), RingBuffer<T>, number )
 		Properties:
 			index: number
 			size: number
@@ -36,7 +30,7 @@
 		```luau
 		local RingBuffer = require(path.to.RingBuffer)
 		
-		local buf = RingBuffer.interface.new(3)
+		local buf = RingBuffer.new(3)
 		buf:Push("a")
 		buf:Push("b")
 		buf:Push("c")
@@ -69,25 +63,9 @@ local function iterOTN <T>(buf: RingBuffer<T>, count: number): (number?, T)
 	return count + 1, buf[(buf.index + count) % size + 1] -- same as above, just flipped
 end
 
--- providing these methods directly to allow avoiding the small overhead of metamethod index in tight loops
-
---[[
-	Iterates from the newest entry to the oldest entry in the given <code>RingBuffer</code>.
-]]
-function RingBufferClass.IterateNewToOld <T>(r: RingBuffer<T>)
-	return iterNTO, r, 0
-end
-
---[[
-	Iterates from the oldest entry to the newest entry in the given <code>RingBuffer</code>.
-]]
-function RingBufferClass.IterateOldToNew <T>(r: RingBuffer<T>)
-	return iterOTN, r, 0
-end
-
 RingBufferClass.interface = {
 	--[[
-		Returns a new <code>RingBuffer</code> object.
+		Returns a new, empty <code>RingBuffer</code>.
 	]]
 	new = function(size: number?): RingBuffer<any>
 		size = size or 1
@@ -113,7 +91,7 @@ RingBufferClass.interface = {
 
 RingBufferClass.schema = {
 	--[[
-		Pushes the given <code>value</code> onto the <code>RingBuffer</code> and incrementing the index.
+		Pushes the given value onto the RingBuffer and updating the index.
 	]]
 	Push = function <T>(self: RingBuffer<T>, value: T)
 		local index = (self.index % self.size) + 1
@@ -122,21 +100,32 @@ RingBufferClass.schema = {
 	end,
 	
 	--[[
-		Returns the newest value in the given <code>RingBuffer</code>.
+		Returns the newest value in the given RingBuffer.
 	]]
 	GetNewest = function <T>(self: RingBuffer<T>): T
 		return self[self.index]
 	end,
 	
 	--[[
-		Returns the oldest value in the given <code>RingBuffer</code>.
+		Returns the oldest value in the given RingBuffer.
 	]]
 	GetOldest = function <T>(self: RingBuffer<T>): T
 		return self[self.index % self.size + 1]
 	end,
 	
-	IterateNewToOld = RingBufferClass.IterateNewToOld,
-	IterateOldToNew = RingBufferClass.IterateOldToNew,
+	--[[
+		Returns an iterator function and the provided RingBuffer for use in a <code>for</code> loop.
+	]]
+	IterateNewToOld = function <T>(self: RingBuffer<T>): ((RingBuffer<T>, number) -> (number?, T), RingBuffer<T>, number)
+		return iterNTO, self, 0
+	end,
+	
+	--[[
+		Returns an iterator function and the provided RingBuffer for use in a <code>for</code> loop.
+	]]
+	IterateOldToNew = function <T>(self: RingBuffer<T>): ((RingBuffer<T>, number) -> (number?, T), RingBuffer<T>, number)
+		return iterOTN, self, 0
+	end,
 }
 
 RingBufferClass.metatable = {
@@ -149,4 +138,4 @@ export type RingBuffer<T> = typeof(RingBufferClass.schema) & {
 	[number]: T
 }
 
-return RingBufferClass
+return RingBufferClass.interface
