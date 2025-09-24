@@ -5,52 +5,75 @@
 
 	Copyright (c) 2025 Nowoshire
 	
-	This software is released under the MIT License.
+	This software is licensed under the MIT License.
 		https://github.com/Nowoshire/Luau-Ring-Buffer/blob/main/LICENSE
-	
-	Constructors:
-		function new(size: number?): (RingBuffer<any>)
-		function fromArray <T>(t: {T}): (RingBuffer<T>)
 		
+	Library:
+		Constructors:
+			-- Returns a new RingBuffer populated with many instances of the specified value.
+			function create <V>(count: number, value: V?): (RingBuffer<V>)
+			
+			-- Converts the given array <code>t</code> into a <code>RingBuffer</code> object and returns it.
+			function fromArray <V>(t: {V}): (RingBuffer<V>)
+			
+		Operators:
+			-- Pushes the given value onto the given RingBuffer and updating the index.
+			function push <V>(r: RingBuffer<V>, value: V): ()
+			
+			-- Returns the newest value in the given RingBuffer.
+			function getNewest <V>(r: RingBuffer<V>): (V)
+			
+			-- Returns the oldest value in the given RingBuffer.
+			function getOldest <V>(r: RingBuffer<V>): (V)
+			
+			-- Returns an iterator function and the provided RingBuffer for use in a for loop.
+			-- NOTE: The number returned from the iterator function is the iteration count, not the index of the value in the RingBuffer.
+			function iterateNewToOld <V>(r: RingBuffer<V>):
+				( (buf: RingBuffer<V>, count: number) -> (number?, V), RingBuffer<V>, number )
+				
+			-- Returns an iterator function and the provided RingBuffer for use in a for loop.
+			-- NOTE: The number returned from the iterator function is the iteration count, not the index of the value in the RingBuffer.
+			function iterateOldToNew <V>(r: RingBuffer<V>):
+				( (buf: RingBuffer<V>, count: number) -> (number?, V), RingBuffer<V>, number )
+				
 	RingBuffer:
-		Methods:
-			function Push <T>(self: RingBuffer<T>, value: T): ()
-			function GetNewest <T>(self: RingBuffer<T>): (T)
-			function GetOldest <T>(self: RingBuffer<T>): (T)
-			function IterateNewToOld <T>(r: RingBuffer<T>):
-				( (buf: RingBuffer<T>, count: number) -> (number?, T), RingBuffer<T>, number )
-			function IterateOldToNew <T>(r: RingBuffer<T>):
-				( (buf: RingBuffer<T>, count: number) -> (number?, T), RingBuffer<T>, number )
 		Properties:
-			index: number
-			size: number
-			[number]: any
+			index: number		-- The index of the last push operation
+			size: number		-- The size of the RingBuffer
+			[number]: any		-- The array portion of the RingBuffer
 			
 	Example:
 		```luau
 		local RingBuffer = require(path.to.RingBuffer)
 		
-		local buf = RingBuffer.new(3)
-		buf:Push("a")
-		buf:Push("b")
-		buf:Push("c")
+		local buf = RingBuffer.create(5) :: RingBuffer.RingBuffer<string>
+		RingBuffer.push(buf, "a")
+		RingBuffer.push(buf, "b")
+		RingBuffer.push(buf, "c")
 		
-		print(buf:GetOldest(), buf:GetNewest()) --> a c
+		print(RingBuffer.getOldest(buf), RingBuffer.getNewest(buf)) --> a c
 		```
 ]]--
 
 --!strict
 
-local RingBufferClass = {}
+local RingBufferLib = {}
 
--- internal iteration functions, not intended for external use
+export type RingBuffer<V> = {
+	[number]: V,
+	index: number,
+	size: number
+}
+
+-- Internal Iteration Functions --
+-- not meant for external use!
 
 local function iterNTO <T>(buf: RingBuffer<T>, count: number): (number?, T)
 	local size = buf.size
 	if count >= size then
 		return nil, nil
 	end
-	
+
 	return count + 1, buf[(buf.index - count) % size + 1] -- arrays are 1 based, so we need to offset by 1
 end
 
@@ -63,79 +86,73 @@ local function iterOTN <T>(buf: RingBuffer<T>, count: number): (number?, T)
 	return count + 1, buf[(buf.index + count) % size + 1] -- same as above, just flipped
 end
 
-RingBufferClass.interface = {
-	--[[
-		Returns a new, empty <code>RingBuffer</code>.
-	]]
-	new = function(size: number?): RingBuffer<any>
-		size = size or 1
-		
-		local obj = table.create(size) :: {[any]: any} -- more efficient mem alloc avoiding resizing down the line
-		obj.index = 0
-		obj.size = size
-		
-		return setmetatable(obj, RingBufferClass.metatable)
-	end,
-	
-	--[[
-		Turns the given array <code>t</code> into a <code>RingBuffer</code> object and returns it.
-	]]
-	fromArray = function <T>(t: {T}): RingBuffer<T>
-		-- typecasting any to allow creating properties without type errors
-		(t :: any).index = 0
-		(t :: any).size = math.min(table.maxn(t), 1)
-		
-		return setmetatable(t :: {[any]: any}, RingBufferClass.metatable)
-	end,
-}
+-- Interface Functions --
 
-RingBufferClass.schema = {
-	--[[
-		Pushes the given value onto the RingBuffer and updating the index.
-	]]
-	Push = function <T>(self: RingBuffer<T>, value: T)
-		local index = (self.index % self.size) + 1
-		self.index = index
-		self[index] = value
-	end,
-	
-	--[[
-		Returns the newest value in the given RingBuffer.
-	]]
-	GetNewest = function <T>(self: RingBuffer<T>): T
-		return self[self.index]
-	end,
-	
-	--[[
-		Returns the oldest value in the given RingBuffer.
-	]]
-	GetOldest = function <T>(self: RingBuffer<T>): T
-		return self[self.index % self.size + 1]
-	end,
-	
-	--[[
-		Returns an iterator function and the provided RingBuffer for use in a <code>for</code> loop.
-	]]
-	IterateNewToOld = function <T>(self: RingBuffer<T>): ((RingBuffer<T>, number) -> (number?, T), RingBuffer<T>, number)
-		return iterNTO, self, 0
-	end,
-	
-	--[[
-		Returns an iterator function and the provided RingBuffer for use in a <code>for</code> loop.
-	]]
-	IterateOldToNew = function <T>(self: RingBuffer<T>): ((RingBuffer<T>, number) -> (number?, T), RingBuffer<T>, number)
-		return iterOTN, self, 0
-	end,
-}
+--[[
+	Returns a new <code>RingBuffer</code> populated with many instances of the specified value.
+]]
+function RingBufferLib.create <V>(count: number, value: V?): RingBuffer<V>
+	local obj = table.create(count, value) :: RingBuffer<V>
+	obj.index = 0
+	obj.size = count
 
-RingBufferClass.metatable = {
-	__index = RingBufferClass.schema,
-}
+	return obj
+end
 
-export type RingBuffer<T> = typeof(RingBufferClass.schema) & {
-	index: number,
-	size: number,
-	[number]: T
-}
+--[[
+	Converts the given array <code>t</code> into a <code>RingBuffer</code> object and returns it.
+]]
+function RingBufferLib.fromArray <T>(t: {T}): RingBuffer<T>
+	-- refine t as a RingBuffer for convenience, compiler will optimize and remove this from bytecode
+	t = t :: RingBuffer<T>
+	
+	t.index = 0
+	t.size = math.max(table.maxn(t), 1)
+	
+	return t
+end
 
-return RingBufferClass.interface
+-- Operator Functions --
+
+--[[
+	Pushes the given value onto the given <code>RingBuffer</code> and updating the index.
+]]
+function RingBufferLib.push <V>(r: RingBuffer<V>, value: V)
+	local index = (r.index % r.size) + 1
+	r.index = index
+	r[index] = value
+end
+
+--[[
+	Returns the newest value in the given <code>RingBuffer</code>.
+]]
+function RingBufferLib.getNewest <V>(r: RingBuffer<V>): V
+	return r[r.index]
+end
+
+--[[
+	Returns the oldest value in the given <code>RingBuffer</code>.
+]]
+function RingBufferLib.getOldest <V>(r: RingBuffer<V>): V
+	return r[r.index % r.size + 1]
+end
+
+--[[
+	Returns an iterator function and the provided <code>RingBuffer</code> for use in a <code>for</code> loop.
+	
+	<strong>Note:</strong> The number returned from the iterator function is the iteration count, not the index of the value in the RingBuffer.
+]]
+function RingBufferLib.iterateNewToOld <V>(r: RingBuffer<V>): ((RingBuffer<V>, number) -> (number?, V), RingBuffer<V>, number)
+	return iterNTO, r, 0
+end
+
+--[[
+	Returns an iterator function and the provided <code>RingBuffer</code> for use in a <code>for</code> loop.
+	
+	<strong>Note:</strong> The number returned from the iterator function is the iteration count, not the index of the value in the RingBuffer.
+]]
+function RingBufferLib.iterateOldToNew <V>(r: RingBuffer<V>): ((RingBuffer<V>, number) -> (number?, V), RingBuffer<V>, number)
+	return iterNTO, r, 0
+end
+
+return RingBufferLib
